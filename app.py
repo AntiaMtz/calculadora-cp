@@ -44,6 +44,10 @@ if 'resultados' not in st.session_state:
 archivo_subido = st.file_uploader("Sube tu archivo Excel o CSV con los CPs", type=["xlsx", "csv"])
 
 if archivo_subido:
+    if 'ultimo_archivo' not in st.session_state or st.session_state.ultimo_archivo != archivo_subido.name:
+        st.session_state.resultados = None
+        st.session_state.ultimo_archivo = archivo_subido.name
+
     if archivo_subido.name.endswith('.csv'):
         df = pd.read_csv(archivo_subido)
     else:
@@ -98,6 +102,7 @@ if archivo_subido:
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
+            # URL de Google Maps corregida para que funcione como enlace
             url = "https://" + "www.google.com" + "/maps/dir/?api=1&origin=" + cp_orig + ",+Mexico&destination=" + cp_dest + ",+Mexico"
             enlaces_maps.append(url)
             
@@ -107,14 +112,18 @@ if archivo_subido:
             barra_progreso.progress(porcentaje)
             texto_progreso.text(f"Procesando fila {i + 1} de {filas_lote} del lote actual...")
         
-        # --- ESTE BLOQUE AHORA ESTÁ AFUERA DEL FOR ---
-        df_lote.iloc[:, 2] = distancias_reales
-        df_lote.iloc[:, 3] = orientaciones
-        df_lote['Tiempo Manejo (Minutos)'] = tiempos_manejo
-        df_lote['URL Maps'] = enlaces_maps
-        df_lote.columns = ['CP Origen', 'CP Destino', 'Distancia Carretera (Kms)', 'Orientación', 'Tiempo Manejo (Minutos)', 'URL Maps']
+        # --- CREACIÓN DE LA TABLA LIMPIA Y PERFECTA ---
+        # Se genera un dataframe 100% nuevo para evitar choques con columnas ocultas del Excel original
+        df_limpio = pd.DataFrame({
+            'CP Origen': df_lote.iloc[:, 0],
+            'CP Destino': df_lote.iloc[:, 1],
+            'Distancia Carretera (Kms)': distancias_reales,
+            'Orientación': orientaciones,
+            'Tiempo Manejo (Minutos)': tiempos_manejo,
+            'URL Maps': enlaces_maps
+        })
         
-        st.session_state.resultados = df_lote
+        st.session_state.resultados = df_limpio
         texto_progreso.empty()
         barra_progreso.empty()
 
