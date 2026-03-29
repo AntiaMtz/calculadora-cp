@@ -4,7 +4,7 @@ import pgeocode
 import math
 
 st.set_page_config(page_title="Calculadora de CPs", layout="wide")
-st.title("Sin Limits")
+st.title("Sin Limits - Calculadora geografica")
 
 def obtener_orientacion(lat1, lon1, lat2, lon2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
@@ -38,8 +38,8 @@ if archivo_subido:
     col_origen = df.columns[0]
     col_destino = df.columns[1]
 
-    if st.button("🚀 Calcular Distancias y Orientación"):
-        with st.spinner('Procesando las 7,644 combinaciones...'):
+    if st.button("🚀 Calcular Distancias, Orientación y Enlaces"):
+        with st.spinner('Procesando las combinaciones y generando enlaces...'):
             df['CP_Origen_str'] = df[col_origen].astype(str).str.zfill(5)
             df['CP_Destino_str'] = df[col_destino].astype(str).str.zfill(5)
             
@@ -52,36 +52,45 @@ if archivo_subido:
             
             distancias = []
             orientaciones = []
+            enlaces_maps = []
             
             for index, row in df.iterrows():
                 cp_orig = row['CP_Origen_str']
                 cp_dest = row['CP_Destino_str']
                 
+                # 1. Distancia
                 d = dist.query_postal_code(cp_orig, cp_dest)
                 distancias.append(round(d, 2))
                 
+                # 2. Orientación
                 lat1 = coords_dict.get(cp_orig, {}).get('latitude')
                 lon1 = coords_dict.get(cp_orig, {}).get('longitude')
                 lat2 = coords_dict.get(cp_dest, {}).get('latitude')
                 lon2 = coords_dict.get(cp_dest, {}).get('longitude')
-                
                 orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
                 
+                # 3. Enlace de Google Maps
+                # Generamos una URL universal de Google Maps indicando origen y destino en México
+                url = f"https://www.google.com/maps/dir/?api=1&origin={cp_orig},+Mexico&destination={cp_dest},+Mexico"
+                enlaces_maps.append(url)
+                
+            # Asignar a las columnas (Distancia, Orientación y URL)
             if len(df.columns) >= 4:
                 df[df.columns[2]] = distancias
                 df[df.columns[3]] = orientaciones
             else:
                 df['Distancia (Kms)'] = distancias
                 df['Orientacion'] = orientaciones
+                
+            # Agregamos la nueva columna con los enlaces
+            df['URL Google Maps'] = enlaces_maps
             
             df_final = df.drop(columns=['CP_Origen_str', 'CP_Destino_str'])
             st.session_state.resultados = df_final
 
-    # --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
     if st.session_state.resultados is not None:
         st.success("¡Cálculo terminado con éxito!")
         
-        # EL BOTÓN APARECE HASTA ARRIBA PARA QUE NO TENGAS QUE BAJAR
         csv = st.session_state.resultados.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="📥 HAZ CLIC AQUÍ PARA DESCARGAR TU ARCHIVO",
