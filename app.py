@@ -36,4 +36,59 @@ if archivo_subido:
         df = pd.read_excel(archivo_subido)
 
     col_origen = df.columns[0]
-    col
+    col_destino = df.columns[1]
+
+    if st.button("🚀 Calcular Distancias y Orientación"):
+        with st.spinner('Procesando las 7,644 combinaciones...'):
+            df['CP_Origen_str'] = df[col_origen].astype(str).str.zfill(5)
+            df['CP_Destino_str'] = df[col_destino].astype(str).str.zfill(5)
+            
+            nomi = pgeocode.Nominatim('mx')
+            dist = pgeocode.GeoDistance('mx')
+            
+            cps_unicos = pd.concat([df['CP_Origen_str'], df['CP_Destino_str']]).unique()
+            df_coords = nomi.query_postal_code(cps_unicos)
+            coords_dict = df_coords.set_index('postal_code')[['latitude', 'longitude']].to_dict('index')
+            
+            distancias = []
+            orientaciones = []
+            
+            for index, row in df.iterrows():
+                cp_orig = row['CP_Origen_str']
+                cp_dest = row['CP_Destino_str']
+                
+                d = dist.query_postal_code(cp_orig, cp_dest)
+                distancias.append(round(d, 2))
+                
+                lat1 = coords_dict.get(cp_orig, {}).get('latitude')
+                lon1 = coords_dict.get(cp_orig, {}).get('longitude')
+                lat2 = coords_dict.get(cp_dest, {}).get('latitude')
+                lon2 = coords_dict.get(cp_dest, {}).get('longitude')
+                
+                orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
+                
+            if len(df.columns) >= 4:
+                df[df.columns[2]] = distancias
+                df[df.columns[3]] = orientaciones
+            else:
+                df['Distancia (Kms)'] = distancias
+                df['Orientacion'] = orientaciones
+            
+            df_final = df.drop(columns=['CP_Origen_str', 'CP_Destino_str'])
+            st.session_state.resultados = df_final
+
+    # --- AQUÍ ESTÁ EL CAMBIO CLAVE ---
+    if st.session_state.resultados is not None:
+        st.success("¡Cálculo terminado con éxito!")
+        
+        # EL BOTÓN APARECE HASTA ARRIBA PARA QUE NO TENGAS QUE BAJAR
+        csv = st.session_state.resultados.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 HAZ CLIC AQUÍ PARA DESCARGAR TU ARCHIVO",
+            data=csv,
+            file_name="Resultados_CPs_Calculados.csv",
+            mime="text/csv"
+        )
+        
+        st.write("### Vista previa de la tabla completa:")
+        st.dataframe(st.session_state.resultados)
