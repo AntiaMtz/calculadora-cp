@@ -6,7 +6,7 @@ import requests
 import time
 
 st.set_page_config(page_title="Calculadora de CPs y Rutas", layout="wide")
-st.title("📍 Calculadora de Rutas por Lotes")
+st.title("Sin Limits - Calculadora de Rutas")
 
 def obtener_orientacion(lat1, lon1, lat2, lon2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
@@ -26,6 +26,7 @@ def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
         return "Error coord", "Error coord"
     try:
+        
         url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
         respuesta = requests.get(url, timeout=5)
         datos = respuesta.json()
@@ -52,7 +53,7 @@ if archivo_subido:
     st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
     
     # --- CONFIGURACIÓN DE LOTES ---
-    st.write("### ⚙️ Procesamiento por Lotes")
+    st.write("Procesamiento por Lotes")
     st.info("Para evitar que el servidor se desconecte, procesa bloques de 1,000 en 1,000.")
     
     col1, col2 = st.columns(2)
@@ -64,7 +65,7 @@ if archivo_subido:
     col_origen = df.columns[0]
     col_destino = df.columns[1]
 
-    if st.button("🚀 Iniciar Cálculo de este Lote"):
+    if st.button("Iniciar Cálculo de este Lote"):
         # Recortar el dataframe al lote seleccionado
         df_lote = df.iloc[inicio-1:fin].copy()
         
@@ -99,8 +100,7 @@ if archivo_subido:
             distancias_reales.append(dist_km)
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
-            
-            url = f"https://www.google.com/maps/dir/?api=1&origin={cp_orig},+Mexico&destination={cp_dest},+Mexico"
+            url = "https://" + "www.google.com" + "/maps/dir/?api=1&origin=" + cp_orig + ",+Mexico&destination=" + cp_dest + ",+Mexico"
             enlaces_maps.append(url)
             
             time.sleep(0.3)
@@ -124,7 +124,7 @@ if archivo_subido:
         
         csv = st.session_state.resultados.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label=f"📥 DESCARGAR LOTE (Filas {inicio} a {fin})",
+            label=f"DESCARGAR LOTE (Filas {inicio} a {fin})",
             data=csv,
             file_name=f"Resultados_Rutas_{inicio}_a_{fin}.csv",
             mime="text/csv"
