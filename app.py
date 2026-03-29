@@ -57,8 +57,8 @@ if archivo_subido:
     st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
     
     # --- CONFIGURACIÓN DE LOTES ---
-    st.write("### ⚙️ Procesamiento por Lotes")
-    st.info("Para evitar que el servidor se desconecte, procesa bloques de 1,000 en 1,000.")
+    st.write(" rocesamiento por Lotes")
+    st.info("Para evitar que colapce el sistema, procesa bloques de 1,000 en 1,000.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -69,7 +69,7 @@ if archivo_subido:
     col_origen = df.columns[0]
     col_destino = df.columns[1]
 
-    if st.button("🚀 Iniciar Cálculo de este Lote"):
+    if st.button("Iniciar Cálculo de este Lote"):
         df_lote = df.iloc[inicio-1:fin].copy()
         
         df_lote['CP_Origen_str'] = df_lote[col_origen].astype(str).str.zfill(5)
@@ -134,7 +134,7 @@ if archivo_subido:
             st.session_state.resultados.to_excel(writer, index=False, sheet_name='Rutas')
         
         st.download_button(
-            label=f"📥 DESCARGAR LOTE (Filas {inicio} a {fin}) EN EXCEL",
+            label=f"DESCARGAR LOTE (Filas {inicio} a {fin}) EN EXCEL",
             data=buffer.getvalue(),
             file_name=f"Resultados_Rutas_{inicio}_a_{fin}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
