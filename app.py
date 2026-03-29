@@ -4,7 +4,7 @@ import pgeocode
 import math
 
 st.set_page_config(page_title="Calculadora de CPs", layout="wide")
-st.title("📍 Calculadora de Distancia y Orientación")
+st.title("Sin Limits")
 
 def obtener_orientacion(lat1, lon1, lat2, lon2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
