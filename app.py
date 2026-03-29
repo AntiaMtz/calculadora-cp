@@ -57,8 +57,8 @@ if archivo_subido:
     st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
     
     # --- CONFIGURACIÓN DE LOTES ---
-    st.write(" rocesamiento por Lotes")
-    st.info("Para evitar que colapce el sistema, procesa bloques de 1,000 en 1,000.")
+    st.write("### ⚙️ Procesamiento por Lotes")
+    st.info("Para evitar que colapse el sistema, procesa bloques de 1,000 en 1,000.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -102,8 +102,8 @@ if archivo_subido:
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
-            # URL de Google Maps corregida para que funcione como enlace
-            url = "https://" + "www.google.com" + "/maps/dir/?api=1&origin=" + cp_orig + ",+Mexico&destination=" + cp_dest + ",+Mexico"
+            # URL de Google Maps forzada a usar las coordenadas matemáticas exactas
+            url = f"https://www.google.com/maps/dir/?api=1&origin={lat1},{lon1}&destination={lat2},{lon2}"
             enlaces_maps.append(url)
             
             time.sleep(0.3)
