@@ -4,6 +4,7 @@ import pgeocode
 import math
 import requests
 import time
+import io
 
 st.set_page_config(page_title="Calculadora de CPs y Rutas", layout="wide")
 st.title("Sin Limits - Calculadora de Rutas")
@@ -26,7 +27,6 @@ def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
         return "Error coord", "Error coord"
     try:
-        
         url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
         respuesta = requests.get(url, timeout=5)
         datos = respuesta.json()
@@ -53,7 +53,7 @@ if archivo_subido:
     st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
     
     # --- CONFIGURACIÓN DE LOTES ---
-    st.write("Procesamiento por Lotes")
+    st.write("### ⚙️ Procesamiento por Lotes")
     st.info("Para evitar que el servidor se desconecte, procesa bloques de 1,000 en 1,000.")
     
     col1, col2 = st.columns(2)
@@ -65,13 +65,11 @@ if archivo_subido:
     col_origen = df.columns[0]
     col_destino = df.columns[1]
 
-    if st.button("Iniciar Cálculo de este Lote"):
-        # Recortar el dataframe al lote seleccionado
+    if st.button("🚀 Iniciar Cálculo de este Lote"):
         df_lote = df.iloc[inicio-1:fin].copy()
         
         df_lote['CP_Origen_str'] = df_lote[col_origen].astype(str).str.zfill(5)
         df_lote['CP_Destino_str'] = df_lote[col_destino].astype(str).str.zfill(5)
-        
         nomi = pgeocode.Nominatim('mx')
         cps_unicos = pd.concat([df_lote['CP_Origen_str'], df_lote['CP_Destino_str']]).unique()
         df_coords = nomi.query_postal_code(cps_unicos)
@@ -86,7 +84,6 @@ if archivo_subido:
         texto_progreso = st.empty()
         filas_lote = len(df_lote)
         
-        # Iterar solo sobre el lote
         for i, (index, row) in enumerate(df_lote.iterrows()):
             cp_orig = row['CP_Origen_str']
             cp_dest = row['CP_Destino_str']
@@ -100,6 +97,7 @@ if archivo_subido:
             distancias_reales.append(dist_km)
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
+            
             url = "https://" + "www.google.com" + "/maps/dir/?api=1&origin=" + cp_orig + ",+Mexico&destination=" + cp_dest + ",+Mexico"
             enlaces_maps.append(url)
             
@@ -108,25 +106,28 @@ if archivo_subido:
             porcentaje = int(((i + 1) / filas_lote) * 100)
             barra_progreso.progress(porcentaje)
             texto_progreso.text(f"Procesando fila {i + 1} de {filas_lote} del lote actual...")
-            
-        df_lote['Distancia Carretera (Kms)'] = distancias_reales
-        df_lote['Tiempo Manejo (Minutos)'] = tiempos_manejo
-        df_lote['Orientacion'] = orientaciones
-        df_lote['URL Validación Maps'] = enlaces_maps
         
-        df_final = df_lote.drop(columns=['CP_Origen_str', 'CP_Destino_str'])
-        st.session_state.resultados = df_final
+        # --- ESTE BLOQUE AHORA ESTÁ AFUERA DEL FOR ---
+        df_lote.iloc[:, 2] = distancias_reales
+        df_lote.iloc[:, 3] = orientaciones
+        df_lote['Tiempo Manejo (Minutos)'] = tiempos_manejo
+        df_lote['URL Maps'] = enlaces_maps
+        df_lote.columns = ['CP Origen', 'CP Destino', 'Distancia Carretera (Kms)', 'Orientación', 'Tiempo Manejo (Minutos)', 'URL Maps']
+        
+        st.session_state.resultados = df_lote
         texto_progreso.empty()
         barra_progreso.empty()
 
     if st.session_state.resultados is not None:
         st.success(f"¡Lote de la fila {inicio} a la {fin} procesado con éxito!")
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            st.session_state.resultados.to_excel(writer, index=False, sheet_name='Rutas')
         
-        csv = st.session_state.resultados.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label=f"DESCARGAR LOTE (Filas {inicio} a {fin})",
-            data=csv,
-            file_name=f"Resultados_Rutas_{inicio}_a_{fin}.csv",
-            mime="text/csv"
+            label=f"📥 DESCARGAR LOTE (Filas {inicio} a {fin}) EN EXCEL",
+            data=buffer.getvalue(),
+            file_name=f"Resultados_Rutas_{inicio}_a_{fin}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.dataframe(st.session_state.resultados)
