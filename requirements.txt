@@ -1,6 +1,5 @@
 streamlit
 pandas
 pgeocode
-folium
-streamlit-folium
 openpyxl
+requests
