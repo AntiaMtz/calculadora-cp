@@ -6,8 +6,7 @@ import requests
 import time
 
 st.set_page_config(page_title="Calculadora de CPs y Rutas", layout="wide")
-st.title("📍 Calculadora de Distancia, Tiempo de Manejo y Orientación")
-st.markdown("**Nota:** El cálculo de rutas vehiculares usa OSRM (Open Source). Procesar miles de datos tomará tiempo para evitar bloqueos del servidor gratuito.")
+st.title("📍 Calculadora de Rutas por Lotes")
 
 def obtener_orientacion(lat1, lon1, lat2, lon2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
@@ -24,7 +23,6 @@ def obtener_orientacion(lat1, lon1, lat2, lon2):
     return sectores[idx]
 
 def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
-    # Usamos el servidor público de OSRM
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
         return "Error coord", "Error coord"
     try:
@@ -45,24 +43,36 @@ if 'resultados' not in st.session_state:
 archivo_subido = st.file_uploader("Sube tu archivo Excel o CSV con los CPs", type=["xlsx", "csv"])
 
 if archivo_subido:
-    if 'ultimo_archivo' not in st.session_state or st.session_state.ultimo_archivo != archivo_subido.name:
-        st.session_state.resultados = None
-        st.session_state.ultimo_archivo = archivo_subido.name
-
     if archivo_subido.name.endswith('.csv'):
         df = pd.read_csv(archivo_subido)
     else:
         df = pd.read_excel(archivo_subido)
 
+    total_registros = len(df)
+    st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
+    
+    # --- CONFIGURACIÓN DE LOTES ---
+    st.write("### ⚙️ Procesamiento por Lotes")
+    st.info("Para evitar que el servidor se desconecte, procesa bloques de 1,000 en 1,000.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        inicio = st.number_input("Fila inicial", min_value=1, max_value=total_registros, value=1)
+    with col2:
+        fin = st.number_input("Fila final", min_value=1, max_value=total_registros, value=min(1000, total_registros))
+
     col_origen = df.columns[0]
     col_destino = df.columns[1]
 
-    if st.button("🚀 Iniciar Cálculo Masivo (Gratis)"):
-        df['CP_Origen_str'] = df[col_origen].astype(str).str.zfill(5)
-        df['CP_Destino_str'] = df[col_destino].astype(str).str.zfill(5)
+    if st.button("🚀 Iniciar Cálculo de este Lote"):
+        # Recortar el dataframe al lote seleccionado
+        df_lote = df.iloc[inicio-1:fin].copy()
+        
+        df_lote['CP_Origen_str'] = df_lote[col_origen].astype(str).str.zfill(5)
+        df_lote['CP_Destino_str'] = df_lote[col_destino].astype(str).str.zfill(5)
         
         nomi = pgeocode.Nominatim('mx')
-        cps_unicos = pd.concat([df['CP_Origen_str'], df['CP_Destino_str']]).unique()
+        cps_unicos = pd.concat([df_lote['CP_Origen_str'], df_lote['CP_Destino_str']]).unique()
         df_coords = nomi.query_postal_code(cps_unicos)
         coords_dict = df_coords.set_index('postal_code')[['latitude', 'longitude']].to_dict('index')
         
@@ -73,9 +83,10 @@ if archivo_subido:
         
         barra_progreso = st.progress(0)
         texto_progreso = st.empty()
-        total_filas = len(df)
+        filas_lote = len(df_lote)
         
-        for index, row in df.iterrows():
+        # Iterar solo sobre el lote
+        for i, (index, row) in enumerate(df_lote.iterrows()):
             cp_orig = row['CP_Origen_str']
             cp_dest = row['CP_Destino_str']
             
@@ -84,45 +95,38 @@ if archivo_subido:
             lat2 = coords_dict.get(cp_dest, {}).get('latitude')
             lon2 = coords_dict.get(cp_dest, {}).get('longitude')
             
-            # Cálculo de Ruta y Tiempo (OSRM)
             dist_km, tiempo_m = obtener_ruta_vehicular(lon1, lat1, lon2, lat2)
             distancias_reales.append(dist_km)
             tiempos_manejo.append(tiempo_m)
-            
-            # Orientación Matemática
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
-            # URL de Google Maps para validación manual
             url = f"https://www.google.com/maps/dir/?api=1&origin={cp_orig},+Mexico&destination={cp_dest},+Mexico"
             enlaces_maps.append(url)
             
-            # Micropausa para no saturar la API gratuita
-            time.sleep(0.3) 
+            time.sleep(0.3)
             
-            # Actualizar progreso
-            porcentaje = int(((index + 1) / total_filas) * 100)
+            porcentaje = int(((i + 1) / filas_lote) * 100)
             barra_progreso.progress(porcentaje)
-            texto_progreso.text(f"Procesando fila {index + 1} de {total_filas}...")
+            texto_progreso.text(f"Procesando fila {i + 1} de {filas_lote} del lote actual...")
             
-        # Asignar a nuevas columnas
-        df['Distancia Carretera (Kms)'] = distancias_reales
-        df['Tiempo Manejo (Minutos)'] = tiempos_manejo
-        df['Orientacion'] = orientaciones
-        df['URL Validación Maps'] = enlaces_maps
+        df_lote['Distancia Carretera (Kms)'] = distancias_reales
+        df_lote['Tiempo Manejo (Minutos)'] = tiempos_manejo
+        df_lote['Orientacion'] = orientaciones
+        df_lote['URL Validación Maps'] = enlaces_maps
         
-        df_final = df.drop(columns=['CP_Origen_str', 'CP_Destino_str'])
+        df_final = df_lote.drop(columns=['CP_Origen_str', 'CP_Destino_str'])
         st.session_state.resultados = df_final
         texto_progreso.empty()
         barra_progreso.empty()
 
     if st.session_state.resultados is not None:
-        st.success("¡Cálculo terminado con éxito!")
+        st.success(f"¡Lote de la fila {inicio} a la {fin} procesado con éxito!")
         
         csv = st.session_state.resultados.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 DESCARGAR TABLA CON TIEMPOS DE MANEJO",
+            label=f"📥 DESCARGAR LOTE (Filas {inicio} a {fin})",
             data=csv,
-            file_name="Resultados_Rutas_Gratis.csv",
+            file_name=f"Resultados_Rutas_{inicio}_a_{fin}.csv",
             mime="text/csv"
         )
         st.dataframe(st.session_state.resultados)
