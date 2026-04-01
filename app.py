@@ -23,24 +23,42 @@ def obtener_orientacion(lat1, lon1, lat2, lon2):
     idx = int((brng + 11.25) / 22.5) % 16
     return sectores[idx]
 
+# --- PLAN DE RESPALDO: CÁLCULO MATEMÁTICO ---
+def calcular_respaldo_matematico(lat1, lon1, lat2, lon2):
+    R = 6371.0 # Radio de la Tierra en km
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distancia_recta = R * c
+    
+    # Se multiplica por 1.3 para simular las vueltas de las calles urbanas
+    distancia_estimada_km = distancia_recta * 1.3 
+    # Tiempo estimado manejando a 30 km/h promedio
+    tiempo_estimado_min = (distancia_estimada_km / 30.0) * 60 
+    
+    return round(distancia_estimada_km, 2), round(tiempo_estimado_min, 0)
+
 def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
         return "Error coord", "Error coord"
     try:
         url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
-        
-        # EL GAFETE DE IDENTIFICACIÓN: Esto evita que el servidor te bloquee ("Falla Servidor")
-        headers = {"User-Agent": "CalculadoraLogistica/1.0"}
-        
+        headers = {"User-Agent": "CalculadoraRutasLogistica/2.0"}
         respuesta = requests.get(url, headers=headers, timeout=5)
-        datos = respuesta.json()
-        if datos.get("code") == "Ok":
-            distancia_km = datos["routes"][0]["distance"] / 1000.0
-            tiempo_min = datos["routes"][0]["duration"] / 60.0
-            return round(distancia_km, 2), round(tiempo_min, 0)
+        
+        # Si el servidor responde bien, usamos la ruta exacta
+        if respuesta.status_code == 200:
+            datos = respuesta.json()
+            if datos.get("code") == "Ok":
+                distancia_km = datos["routes"][0]["distance"] / 1000.0
+                tiempo_min = datos["routes"][0]["duration"] / 60.0
+                return round(distancia_km, 2), round(tiempo_min, 0)
     except Exception:
         pass
-    return "Falla Servidor", "Falla Servidor"
+    
+    # Si el servidor nos bloquea (Falla Servidor), entra automáticamente el respaldo matemático
+    return calcular_respaldo_matematico(lat1, lon1, lat2, lon2)
 
 if 'resultados' not in st.session_state:
     st.session_state.resultados = None
