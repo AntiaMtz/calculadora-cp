@@ -28,7 +28,11 @@ def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
         return "Error coord", "Error coord"
     try:
         url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
-        respuesta = requests.get(url, timeout=5)
+        
+        # EL GAFETE DE IDENTIFICACIÓN: Esto evita que el servidor te bloquee ("Falla Servidor")
+        headers = {"User-Agent": "CalculadoraLogistica/1.0"}
+        
+        respuesta = requests.get(url, headers=headers, timeout=5)
         datos = respuesta.json()
         if datos.get("code") == "Ok":
             distancia_km = datos["routes"][0]["distance"] / 1000.0
@@ -56,7 +60,6 @@ if archivo_subido:
     total_registros = len(df)
     st.write(f"Tu archivo tiene **{total_registros}** combinaciones.")
     
-    # --- CONFIGURACIÓN DE LOTES ---
     st.write("### ⚙️ Procesamiento por Lotes")
     st.info("Para evitar que colapse el sistema, procesa bloques de 1,000 en 1,000.")
     
@@ -102,9 +105,12 @@ if archivo_subido:
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
-            # URL oficial de Google Maps usando las coordenadas exactas calculadas
-            url = f"https://www.google.com/maps/dir/?api=1&origin={lat1},{lon1}&destination={lat2},{lon2}"
-            enlaces_maps.append(url)
+            # LA URL OFICIAL E IMPOSIBLE DE ROMPER DE GOOGLE MAPS
+            if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
+                url_maps = "Sin coordenadas"
+            else:
+                url_maps = f"https://www.google.com/maps/dir/?api=1&origin={lat1},{lon1}&destination={lat2},{lon2}"
+            enlaces_maps.append(url_maps)
             
             time.sleep(0.3)
             
@@ -112,8 +118,6 @@ if archivo_subido:
             barra_progreso.progress(porcentaje)
             texto_progreso.text(f"Procesando fila {i + 1} de {filas_lote} del lote actual...")
         
-        # --- CREACIÓN DE LA TABLA LIMPIA Y PERFECTA ---
-        # El .tolist() evita que las longitudes no coincidan al armar el dataframe
         df_limpio = pd.DataFrame({
             'CP Origen': df_lote.iloc[:, 0].tolist(),
             'CP Destino': df_lote.iloc[:, 1].tolist(),
