@@ -104,8 +104,6 @@ if archivo_subido:
             
             # URL de Google Maps forzada a usar las coordenadas matemáticas exactas
             url = f"https://www.google.com/maps/dir/?api=1&origin={lat1},{lon1}&destination={lat2},{lon2}"
-            enlaces_maps.append(url)
-            
             time.sleep(0.3)
             
             porcentaje = int(((i + 1) / filas_lote) * 100)
