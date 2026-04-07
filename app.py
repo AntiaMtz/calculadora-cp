@@ -34,31 +34,39 @@ def calcular_respaldo_matematico(lat1, lon1, lat2, lon2):
     
     # Se multiplica por 1.3 para simular las vueltas de las calles urbanas
     distancia_estimada_km = distancia_recta * 1.3 
-    # Tiempo estimado manejando a 30 km/h promedio
     tiempo_estimado_min = (distancia_estimada_km / 30.0) * 60 
     
-    return round(distancia_estimada_km, 2), round(tiempo_estimado_min, 0)
+    return round(distancia_estimada_km, 2), round(tiempo_estimado_min, 0), distancia_recta
 
 def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
     if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
         return "Error coord", "Error coord"
+    
+    # 1. Calculamos la ruta matemática base
+    dist_estimada, tiempo_estimado, dist_recta = calcular_respaldo_matematico(lat1, lon1, lat2, lon2)
+
     try:
         url = f"http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false"
         headers = {"User-Agent": "CalculadoraRutasLogistica/2.0"}
         respuesta = requests.get(url, headers=headers, timeout=5)
         
-        # Si el servidor responde bien, usamos la ruta exacta
         if respuesta.status_code == 200:
             datos = respuesta.json()
             if datos.get("code") == "Ok":
-                distancia_km = datos["routes"][0]["distance"] / 1000.0
-                tiempo_min = datos["routes"][0]["duration"] / 60.0
-                return round(distancia_km, 2), round(tiempo_min, 0)
+                distancia_km_osrm = datos["routes"][0]["distance"] / 1000.0
+                tiempo_min_osrm = datos["routes"][0]["duration"] / 60.0
+                
+                # --- FILTRO DE RUTA INTELIGENTE ---
+                # Si OSRM da una distancia absurda (más del 80% extra que la línea recta), lo descartamos
+                if distancia_km_osrm > (dist_recta * 1.8):
+                    return dist_estimada, tiempo_estimado
+                
+                return round(distancia_km_osrm, 2), round(tiempo_min_osrm, 0)
     except Exception:
         pass
     
-    # Si el servidor nos bloquea (Falla Servidor), entra automáticamente el respaldo matemático
-    return calcular_respaldo_matematico(lat1, lon1, lat2, lon2)
+    # Si falla la conexión, entra el respaldo
+    return dist_estimada, tiempo_estimado
 
 if 'resultados' not in st.session_state:
     st.session_state.resultados = None
@@ -123,7 +131,7 @@ if archivo_subido:
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
-            # LA URL OFICIAL E IMPOSIBLE DE ROMPER DE GOOGLE MAPS
+            # --- URL REAL Y OFICIAL DE GOOGLE MAPS ---
             if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
                 url_maps = "Sin coordenadas"
             else:
