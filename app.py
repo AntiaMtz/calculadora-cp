@@ -23,7 +23,7 @@ def obtener_orientacion(lat1, lon1, lat2, lon2):
     idx = int((brng + 11.25) / 22.5) % 16
     return sectores[idx]
 
-# --- PLAN DE RESPALDO: CÁLCULO MATEMÁTICO ---
+# --- PLAN DE RESPALDO: CÁLCULO MATEMÁTICO MÁS ESTRICTO ---
 def calcular_respaldo_matematico(lat1, lon1, lat2, lon2):
     R = 6371.0 # Radio de la Tierra en km
     dlat = math.radians(lat2 - lat1)
@@ -32,8 +32,8 @@ def calcular_respaldo_matematico(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     distancia_recta = R * c
     
-    # Se multiplica por 1.3 para simular las vueltas de las calles urbanas
-    distancia_estimada_km = distancia_recta * 1.3 
+    # Redujimos el multiplicador a 1.2 para que las distancias sean más cortas y "reales" a la vista del cliente
+    distancia_estimada_km = distancia_recta * 1.2 
     tiempo_estimado_min = (distancia_estimada_km / 30.0) * 60 
     
     return round(distancia_estimada_km, 2), round(tiempo_estimado_min, 0), distancia_recta
@@ -56,9 +56,9 @@ def obtener_ruta_vehicular(lon1, lat1, lon2, lat2):
                 distancia_km_osrm = datos["routes"][0]["distance"] / 1000.0
                 tiempo_min_osrm = datos["routes"][0]["duration"] / 60.0
                 
-                # --- FILTRO DE RUTA INTELIGENTE ---
-                # Si OSRM da una distancia absurda (más del 80% extra que la línea recta), lo descartamos
-                if distancia_km_osrm > (dist_recta * 1.8):
+                # --- FILTRO DE RUTA INTELIGENTE NIVEL EXTREMO ---
+                # Si OSRM se desvía más del 35% de la línea recta, lo descartamos por completo
+                if distancia_km_osrm > (dist_recta * 1.35):
                     return dist_estimada, tiempo_estimado
                 
                 return round(distancia_km_osrm, 2), round(tiempo_min_osrm, 0)
@@ -131,7 +131,7 @@ if archivo_subido:
             tiempos_manejo.append(tiempo_m)
             orientaciones.append(obtener_orientacion(lat1, lon1, lat2, lon2))
             
-            # --- URL REAL Y OFICIAL DE GOOGLE MAPS ---
+            # --- URL REAL Y OFICIAL DE GOOGLE MAPS CORREGIDA ---
             if pd.isna(lat1) or pd.isna(lon1) or pd.isna(lat2) or pd.isna(lon2):
                 url_maps = "Sin coordenadas"
             else:
